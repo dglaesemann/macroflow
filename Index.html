@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MacroFlow | Food & Macro Tracker</title>
+  <style>
+    body{
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to bottom, #f8fafc, #eef4ff);
+      padding: 30px;
+      margin: 0;
+      color: #1f2937;
+    }
+
+    .container{
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .hero{
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .hero h1{
+      margin-bottom: 8px;
+      font-size: 38px;
+    }
+
+    .hero p{
+      margin: 0;
+      font-size: 17px;
+      color: #4b5563;
+    }
+
+    .card{
+      background: white;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+
+    h2, h3{
+      margin-top: 0;
+    }
+
+    input, select, button{
+      padding: 12px;
+      width: 100%;
+      margin: 8px 0;
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+
+    input, select{
+      border: 1px solid #d1d5db;
+      background: #fff;
+    }
+
+    button{
+      background: #2563eb;
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    button:hover{
+      background: #1d4ed8;
+    }
+
+    .small-text{
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    .total-box{
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .total-box p{
+      margin: 8px 0;
+      font-size: 16px;
+    }
+
+    #results{
+      min-height: 180px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="hero">
+      <h1>MacroFlow</h1>
+      <p>Track your food, calories, and macros with a cleaner, smarter daily dashboard.</p>
+    </div>
+
+    <div class="card">
+      <h2>Search Food</h2>
+      <p class="small-text">Search the USDA database, choose a result, and add it to your daily log.</p>
+
+      <input id="search" placeholder="Type food name">
+      <button onclick="searchFood()">Search</button>
+
+      <select id="results" size="6"></select>
+
+      <button onclick="addFood()">Add Selected Food</button>
+    </div>
+
+    <div class="card">
+      <h2>Daily Totals</h2>
+      <div class="total-box">
+        <p><strong>Calories:</strong> <span id="totalCalories">0</span></p>
+        <p><strong>Protein:</strong> <span id="totalProtein">0</span> g</p>
+        <p><strong>Carbs:</strong> <span id="totalCarbs">0</span> g</p>
+        <p><strong>Fat:</strong> <span id="totalFat">0</span> g</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const API_KEY = "PASTE_YOUR_USDA_API_KEY_HERE";
+
+    let totals = { cal: 0, pro: 0, carb: 0, fat: 0 };
+    let searchResults = [];
+    let selectedFood = null;
+
+    const customFoods = [
+      { name: "Muscle Milk Zero", cal: 100, pro: 20, carb: 3, fat: 1.5 },
+      { name: "Oatmeal", cal: 300, pro: 10, carb: 54, fat: 6 },
+      { name: "Turkey Breast", cal: 180, pro: 39, carb: 0, fat: 2 }
+    ];
+
+    async function searchFood() {
+      const q = document.getElementById("search").value.trim();
+      const list = document.getElementById("results");
+
+      list.innerHTML = "";
+      searchResults = [];
+      selectedFood = null;
+
+      if (!q) return;
+
+      try {
+        const res = await fetch(
+          `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&api_key=${API_KEY}`
+        );
+        const data = await res.json();
+
+        if (data.foods && data.foods.length) {
+          data.foods.slice(0, 6).forEach((f, index) => {
+            const cal = getNutrient(f, "Energy");
+            const pro = getNutrient(f, "Protein");
+            const carb = getNutrient(f, "Carbohydrate, by difference");
+            const fat = getNutrient(f, "Total lipid (fat)");
+
+            searchResults.push({
+              cal: cal,
+              pro: pro,
+              carb: carb,
+              fat: fat
+            });
+
+            const opt = document.createElement("option");
+            opt.value = index;
+            opt.text = `${f.description} — ${cal} cal | P:${pro} C:${carb} F:${fat}`;
+            list.appendChild(opt);
+          });
+
+          list.onchange = function() {
+            selectedFood = searchResults[this.value];
+          };
+
+          if (searchResults.length > 0) {
+            list.selectedIndex = 0;
+            selectedFood = searchResults[0];
+          }
+
+          return;
+        }
+      } catch (error) {
+        console.log("USDA search failed, using fallback foods.");
+      }
+
+      const fallbackMatches = customFoods.filter(f =>
+        f.name.toLowerCase().includes(q.toLowerCase())
+      );
+
+      fallbackMatches.forEach((f, index) => {
+        searchResults.push({
+          cal: f.cal,
+          pro: f.pro,
+          carb: f.carb,
+          fat: f.fat
+        });
+
+        const opt = document.createElement("option");
+        opt.value = index;
+        opt.text = `${f.name} — ${f.cal} cal | P:${f.pro} C:${f.carb} F:${f.fat}`;
+        list.appendChild(opt);
+      });
+
+      list.onchange = function() {
+        selectedFood = searchResults[this.value];
+      };
+
+      if (searchResults.length > 0) {
+        list.selectedIndex = 0;
+        selectedFood = searchResults[0];
+      }
+    }
+
+    function getNutrient(food, name) {
+      const n = food.foodNutrients.find(x => x.nutrientName === name);
+      return n ? Math.round(n.value) : 0;
+    }
+
+    function addFood() {
+      if (!selectedFood) return;
+
+      totals.cal += selectedFood.cal;
+      totals.pro += selectedFood.pro;
+      totals.carb += selectedFood.carb;
+      totals.fat += selectedFood.fat;
+
+      document.getElementById("totalCalories").innerText = totals.cal;
+      document.getElementById("totalProtein").innerText = totals.pro;
+      document.getElementById("totalCarbs").innerText = totals.carb;
+      document.getElementById("totalFat").innerText = totals.fat;
+    }
+  </script>
+</body>
+</html>
