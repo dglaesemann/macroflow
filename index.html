@@ -1,243 +1,290 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MacroFlow | Food & Macro Tracker</title>
-  <style>
-    body{
-      font-family: Arial, sans-serif;
-      background: linear-gradient(to bottom, #f8fafc, #eef4ff);
-      padding: 30px;
-      margin: 0;
-      color: #1f2937;
+<script>
+  const STORAGE_KEY = "macroTrackerAutoV2";
+
+  const foodDatabase = [
+    { name: "Muscle Milk Zero", serving: "1 bottle", calories: 100, protein: 20, carbs: 3, fat: 1.5 },
+    { name: "Whey Protein", serving: "1 scoop", calories: 120, protein: 24, carbs: 3, fat: 1.5 },
+    { name: "Oatmeal", serving: "1 cup dry", calories: 300, protein: 10, carbs: 54, fat: 6 },
+    { name: "Old-Fashioned Oatmeal", serving: "1 cup dry", calories: 300, protein: 10, carbs: 54, fat: 6 },
+    { name: "Jasmine Rice", serving: "1 cup cooked", calories: 205, protein: 4, carbs: 45, fat: 0.4 },
+    { name: "Protein Pasta", serving: "2 oz dry", calories: 190, protein: 10, carbs: 35, fat: 1.5 },
+    { name: "Egg", serving: "1 large", calories: 70, protein: 6, carbs: 0.4, fat: 5 },
+    { name: "Egg Whites", serving: "1 cup", calories: 126, protein: 27, carbs: 2, fat: 0.4 },
+    { name: "Fat-Free Cottage Cheese", serving: "1 cup", calories: 160, protein: 28, carbs: 6, fat: 0 },
+    { name: "Fat-Free Greek Yogurt", serving: "1 cup", calories: 130, protein: 23, carbs: 9, fat: 0 },
+    { name: "Lean Ground Turkey", serving: "4 oz cooked", calories: 170, protein: 22, carbs: 0, fat: 9 },
+    { name: "Turkey Breast", serving: "6 oz cooked", calories: 180, protein: 39, carbs: 0, fat: 2 },
+    { name: "Chicken Breast", serving: "6 oz cooked", calories: 280, protein: 53, carbs: 0, fat: 6 },
+    { name: "Shrimp", serving: "8 pieces", calories: 60, protein: 14, carbs: 0, fat: 0.5 },
+    { name: "Tuna", serving: "1 can", calories: 120, protein: 26, carbs: 0, fat: 1 },
+    { name: "Spinach", serving: "1 cup", calories: 7, protein: 0.9, carbs: 1.1, fat: 0.1 },
+    { name: "Bell Pepper", serving: "1/4 cup", calories: 10, protein: 0.3, carbs: 2.3, fat: 0.1 },
+    { name: "Mixed Vegetables", serving: "1/2 cup", calories: 40, protein: 2, carbs: 8, fat: 0 },
+    { name: "Rice Cakes", serving: "1 cake", calories: 35, protein: 0.7, carbs: 7, fat: 0.3 },
+    { name: "Almond Butter", serving: "1 tbsp", calories: 98, protein: 3.4, carbs: 3.4, fat: 9 },
+    { name: "Banana", serving: "1 medium", calories: 105, protein: 1.3, carbs: 27, fat: 0.4 },
+    { name: "Blueberries", serving: "1 cup", calories: 84, protein: 1.1, carbs: 21, fat: 0.5 }
+  ];
+
+  let foods = [];
+  let targets = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  let selectedFood = null;
+
+  function roundValue(value) {
+    return Math.round(value * 10) / 10;
+  }
+
+  function populateFoodList(filter = "") {
+    const datalist = document.getElementById("foodList");
+    datalist.innerHTML = "";
+
+    const filtered = foodDatabase.filter(food =>
+      food.name.toLowerCase().includes(filter.toLowerCase())
+    );
+
+    filtered.forEach(food => {
+      const option = document.createElement("option");
+      option.value = food.name;
+      datalist.appendChild(option);
+    });
+  }
+
+  function getFoodByName(name) {
+    return foodDatabase.find(food => food.name.toLowerCase() === name.trim().toLowerCase());
+  }
+
+  function saveToStorage() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ foods, targets }));
+  }
+
+  function loadFromStorage() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      foods = Array.isArray(parsed.foods) ? parsed.foods : [];
+      targets = parsed.targets || targets;
+    } catch (e) {
+      foods = [];
     }
+  }
 
-    .container{
-      max-width: 900px;
-      margin: 0 auto;
-    }
+  function populateTargetFields() {
+    document.getElementById("targetCalories").value = targets.calories || "";
+    document.getElementById("targetProtein").value = targets.protein || "";
+    document.getElementById("targetCarbs").value = targets.carbs || "";
+    document.getElementById("targetFat").value = targets.fat || "";
+  }
 
-    .hero{
-      text-align: center;
-      margin-bottom: 24px;
-    }
+  function saveTargets() {
+    targets = {
+      calories: Number(document.getElementById("targetCalories").value) || 0,
+      protein: Number(document.getElementById("targetProtein").value) || 0,
+      carbs: Number(document.getElementById("targetCarbs").value) || 0,
+      fat: Number(document.getElementById("targetFat").value) || 0
+    };
+    saveToStorage();
+    renderAll();
+    alert("Targets saved.");
+  }
 
-    .hero h1{
-      margin-bottom: 8px;
-      font-size: 38px;
-    }
+  function updateFoodPreview() {
+    const foodName = document.getElementById("foodSearch").value;
+    const servings = Number(document.getElementById("servings").value) || 1;
+    const food = getFoodByName(foodName);
+    const preview = document.getElementById("foodPreview");
+    const servingText = document.getElementById("selectedServingText");
 
-    .hero p{
-      margin: 0;
-      font-size: 17px;
-      color: #4b5563;
-    }
+    populateFoodList(foodName);
 
-    .card{
-      background: white;
-      padding: 24px;
-      border-radius: 16px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-      margin-bottom: 20px;
-    }
-
-    h2, h3{
-      margin-top: 0;
-    }
-
-    input, select, button{
-      padding: 12px;
-      width: 100%;
-      margin: 8px 0;
-      border-radius: 8px;
-      box-sizing: border-box;
-      font-size: 16px;
-    }
-
-    input, select{
-      border: 1px solid #d1d5db;
-      background: #fff;
-    }
-
-    button{
-      background: #2563eb;
-      color: white;
-      border: none;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
-
-    button:hover{
-      background: #1d4ed8;
-    }
-
-    .small-text{
-      font-size: 14px;
-      color: #6b7280;
-    }
-
-    .total-box{
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 12px;
-      padding: 16px;
-      margin-top: 12px;
-    }
-
-    .total-box p{
-      margin: 8px 0;
-      font-size: 16px;
-    }
-
-    #results{
-      min-height: 180px;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-
-    <div class="hero">
-      <h1>MacroFlow</h1>
-      <p>Track your food, calories, and macros with a cleaner, smarter daily dashboard.</p>
-    </div>
-
-    <div class="card">
-      <h2>Search Food</h2>
-      <p class="small-text">Search the USDA database, choose a result, and add it to your daily log.</p>
-
-      <input id="search" placeholder="Type food name">
-      <button onclick="searchFood()">Search</button>
-
-      <select id="results" size="6"></select>
-
-      <button onclick="addFood()">Add Selected Food</button>
-    </div>
-
-    <div class="card">
-      <h2>Daily Totals</h2>
-      <div class="total-box">
-        <p><strong>Calories:</strong> <span id="totalCalories">0</span></p>
-        <p><strong>Protein:</strong> <span id="totalProtein">0</span> g</p>
-        <p><strong>Carbs:</strong> <span id="totalCarbs">0</span> g</p>
-        <p><strong>Fat:</strong> <span id="totalFat">0</span> g</p>
-      </div>
-    </div>
-
-  </div>
-
-  <script>
-    const API_KEY = "PASTE_YOUR_USDA_API_KEY_HERE";
-
-    let totals = { cal: 0, pro: 0, carb: 0, fat: 0 };
-    let searchResults = [];
-    let selectedFood = null;
-
-    const customFoods = [
-      { name: "Muscle Milk Zero", cal: 100, pro: 20, carb: 3, fat: 1.5 },
-      { name: "Oatmeal", cal: 300, pro: 10, carb: 54, fat: 6 },
-      { name: "Turkey Breast", cal: 180, pro: 39, carb: 0, fat: 2 }
-    ];
-
-    async function searchFood() {
-      const q = document.getElementById("search").value.trim();
-      const list = document.getElementById("results");
-
-      list.innerHTML = "";
-      searchResults = [];
+    if (!food) {
       selectedFood = null;
-
-      if (!q) return;
-
-      try {
-        const res = await fetch(
-          `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&api_key=${API_KEY}`
-        );
-        const data = await res.json();
-
-        if (data.foods && data.foods.length) {
-          data.foods.slice(0, 6).forEach((f, index) => {
-            const cal = getNutrient(f, "Energy");
-            const pro = getNutrient(f, "Protein");
-            const carb = getNutrient(f, "Carbohydrate, by difference");
-            const fat = getNutrient(f, "Total lipid (fat)");
-
-            searchResults.push({
-              cal: cal,
-              pro: pro,
-              carb: carb,
-              fat: fat
-            });
-
-            const opt = document.createElement("option");
-            opt.value = index;
-            opt.text = `${f.description} — ${cal} cal | P:${pro} C:${carb} F:${fat}`;
-            list.appendChild(opt);
-          });
-
-          list.onchange = function() {
-            selectedFood = searchResults[this.value];
-          };
-
-          if (searchResults.length > 0) {
-            list.selectedIndex = 0;
-            selectedFood = searchResults[0];
-          }
-
-          return;
-        }
-      } catch (error) {
-        console.log("USDA search failed, using fallback foods.");
-      }
-
-      const fallbackMatches = customFoods.filter(f =>
-        f.name.toLowerCase().includes(q.toLowerCase())
-      );
-
-      fallbackMatches.forEach((f, index) => {
-        searchResults.push({
-          cal: f.cal,
-          pro: f.pro,
-          carb: f.carb,
-          fat: f.fat
-        });
-
-        const opt = document.createElement("option");
-        opt.value = index;
-        opt.text = `${f.name} — ${f.cal} cal | P:${f.pro} C:${f.carb} F:${f.fat}`;
-        list.appendChild(opt);
-      });
-
-      list.onchange = function() {
-        selectedFood = searchResults[this.value];
-      };
-
-      if (searchResults.length > 0) {
-        list.selectedIndex = 0;
-        selectedFood = searchResults[0];
-      }
+      preview.textContent = "Type part of a food name, then choose one from the list.";
+      servingText.value = "";
+      return;
     }
 
-    function getNutrient(food, name) {
-      const n = food.foodNutrients.find(x => x.nutrientName === name);
-      return n ? Math.round(n.value) : 0;
+    selectedFood = food;
+    servingText.value = food.serving;
+    preview.textContent =
+      `${food.name} (${food.serving}) × ${servings} = ` +
+      `${roundValue(food.calories * servings)} cal, ` +
+      `${roundValue(food.protein * servings)}g protein, ` +
+      `${roundValue(food.carbs * servings)}g carbs, ` +
+      `${roundValue(food.fat * servings)}g fat`;
+  }
+
+  function clearFoodForm() {
+    document.getElementById("meal").value = "Meal 1";
+    document.getElementById("foodSearch").value = "";
+    document.getElementById("servings").value = 1;
+    document.getElementById("selectedServingText").value = "";
+    document.getElementById("foodPreview").textContent = "Choose a food to preview its macros.";
+    selectedFood = null;
+    populateFoodList();
+  }
+
+  function addFood() {
+    const meal = document.getElementById("meal").value;
+    const servings = Number(document.getElementById("servings").value) || 1;
+    const food = selectedFood || getFoodByName(document.getElementById("foodSearch").value);
+
+    if (!food) {
+      alert("Type part of a food name and select one from the list.");
+      return;
     }
 
-    function addFood() {
-      if (!selectedFood) return;
+    const entry = {
+      meal,
+      foodName: food.name,
+      servingLabel: food.serving,
+      servings: roundValue(servings),
+      calories: roundValue(food.calories * servings),
+      protein: roundValue(food.protein * servings),
+      carbs: roundValue(food.carbs * servings),
+      fat: roundValue(food.fat * servings)
+    };
 
-      totals.cal += selectedFood.cal;
-      totals.pro += selectedFood.pro;
-      totals.carb += selectedFood.carb;
-      totals.fat += selectedFood.fat;
+    foods.push(entry);
+    saveToStorage();
+    renderAll();
+    clearFoodForm();
+  }
 
-      document.getElementById("totalCalories").innerText = totals.cal;
-      document.getElementById("totalProtein").innerText = totals.pro;
-      document.getElementById("totalCarbs").innerText = totals.carb;
-      document.getElementById("totalFat").innerText = totals.fat;
+  function deleteFood(index) {
+    if (!confirm("Delete this food entry?")) return;
+    foods.splice(index, 1);
+    saveToStorage();
+    renderAll();
+  }
+
+  function clearAllData() {
+    if (!confirm("This will delete all foods and targets. Continue?")) return;
+    foods = [];
+    targets = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    localStorage.removeItem(STORAGE_KEY);
+    populateTargetFields();
+    clearFoodForm();
+    renderAll();
+  }
+
+  function calculateTotals() {
+    return foods.reduce((totals, item) => {
+      totals.calories += item.calories;
+      totals.protein += item.protein;
+      totals.carbs += item.carbs;
+      totals.fat += item.fat;
+      return totals;
+    }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  }
+
+  function getMealTotals() {
+    const mealNames = ["Meal 1", "Meal 2", "Meal 3", "Meal 4", "Meal 5"];
+    const result = {};
+    mealNames.forEach(meal => {
+      result[meal] = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    });
+
+    foods.forEach(item => {
+      result[item.meal].calories += item.calories;
+      result[item.meal].protein += item.protein;
+      result[item.meal].carbs += item.carbs;
+      result[item.meal].fat += item.fat;
+    });
+
+    return result;
+  }
+
+  function renderSummary() {
+    const totals = calculateTotals();
+
+    document.getElementById("totalCaloriesDisplay").textContent = roundValue(totals.calories);
+    document.getElementById("foodCountDisplay").textContent = foods.length;
+
+    document.getElementById("caloriesProgress").textContent = `${roundValue(totals.calories)} / ${targets.calories || 0}`;
+    document.getElementById("proteinProgress").textContent = `${roundValue(totals.protein)}g / ${targets.protein || 0}g`;
+    document.getElementById("carbsProgress").textContent = `${roundValue(totals.carbs)}g / ${targets.carbs || 0}g`;
+    document.getElementById("fatProgress").textContent = `${roundValue(totals.fat)}g / ${targets.fat || 0}g`;
+
+    document.getElementById("caloriesRemaining").textContent = `Remaining: ${roundValue((targets.calories || 0) - totals.calories)}`;
+    document.getElementById("proteinRemaining").textContent = `Remaining: ${roundValue((targets.protein || 0) - totals.protein)}g`;
+    document.getElementById("carbsRemaining").textContent = `Remaining: ${roundValue((targets.carbs || 0) - totals.carbs)}g`;
+    document.getElementById("fatRemaining").textContent = `Remaining: ${roundValue((targets.fat || 0) - totals.fat)}g`;
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById("foodTableBody");
+    const emptyState = document.getElementById("emptyState");
+    const tableWrap = document.getElementById("tableWrap");
+
+    tbody.innerHTML = "";
+
+    if (foods.length === 0) {
+      emptyState.style.display = "block";
+      tableWrap.style.display = "none";
+      return;
     }
-  </script>
-</body>
-</html>
+
+    emptyState.style.display = "none";
+    tableWrap.style.display = "block";
+
+    foods.forEach((item, index) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${item.meal}</td>
+        <td>${escapeHtml(item.foodName)}<br><span style="color:#6b7280;font-size:0.85rem;">${escapeHtml(item.servingLabel)}</span></td>
+        <td>${item.servings}</td>
+        <td>${item.calories}</td>
+        <td>${item.protein}g</td>
+        <td>${item.carbs}g</td>
+        <td>${item.fat}g</td>
+        <td><button class="table-btn danger" onclick="deleteFood(${index})">Delete</button></td>
+      `;
+      tbody.appendChild(row);
+    });
+  }
+
+  function renderMealTotals() {
+    const mealTotals = getMealTotals();
+    const container = document.getElementById("mealTotalsContainer");
+    container.innerHTML = "";
+
+    Object.keys(mealTotals).forEach(meal => {
+      const totals = mealTotals[meal];
+      const div = document.createElement("div");
+      div.className = "meal-box";
+      div.innerHTML = `
+        <strong>${meal}</strong>
+        <div class="meal-line">Calories: ${roundValue(totals.calories)}</div>
+        <div class="meal-line">Protein: ${roundValue(totals.protein)}g</div>
+        <div class="meal-line">Carbs: ${roundValue(totals.carbs)}g</div>
+        <div class="meal-line">Fat: ${roundValue(totals.fat)}g</div>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  function escapeHtml(str) {
+    return str
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function renderAll() {
+    renderSummary();
+    renderTable();
+    renderMealTotals();
+  }
+
+  document.getElementById("foodSearch").addEventListener("input", updateFoodPreview);
+  document.getElementById("foodSearch").addEventListener("change", updateFoodPreview);
+  document.getElementById("servings").addEventListener("input", updateFoodPreview);
+
+  populateFoodList();
+  loadFromStorage();
+  populateTargetFields();
+  renderAll();
+</script>
